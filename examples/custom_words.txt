@@ -1,0 +1,77 @@
+# Sample Custom Words for Password Generation
+# Lines starting with # are comments and will be ignored
+# One word per line - these will be combined with years, symbols, etc.
+
+# Company/Organization Terms
+company
+corp
+enterprise
+organization
+business
+finance
+accounting
+sales
+marketing
+support
+helpdesk
+admin
+administrator
+manager
+supervisor
+executive
+
+# Technology Terms
+server
+database
+network
+security
+firewall
+router
+switch
+backup
+storage
+cloud
+system
+application
+software
+hardware
+laptop
+desktop
+mobile
+
+# Department Names
+hr
+it
+legal
+operations
+development
+engineering
+research
+training
+facilities
+procurement
+
+# Common Business Words
+project
+budget
+report
+meeting
+conference
+training
+policy
+procedure
+standard
+compliance
+audit
+review
+
+# Seasonal/Event Terms
+quarter
+fiscal
+annual
+monthly
+weekly
+conference
+summit
+retreat
+workshop 

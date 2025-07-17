@@ -1,0 +1,17 @@
+# Password Generator for Penetration Testing
+# This project has no external dependencies by design for maximum portability
+
+# Python Standard Library Only
+# Requires Python 3.6+
+
+# No external packages required - this ensures:
+# 1. Maximum portability across different environments
+# 2. No dependency conflicts during penetration testing
+# 3. Easier deployment in restricted environments
+# 4. Faster execution without external imports
+
+# Development dependencies (optional):
+# pytest>=6.0.0
+# black>=21.0.0
+# flake8>=3.8.0
+# mypy>=0.812 

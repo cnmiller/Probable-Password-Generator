@@ -22,6 +22,7 @@ A sophisticated, likelihood-aware password generator designed for penetration te
 - **Corporate Policy Compliance**: Bonus scoring for common password policies
 - **Symbol Frequency Ordering**: Uses real-world symbol usage statistics
 - **Length Optimization**: Prioritizes commonly required password lengths
+- **Intelligent Length Padding**: Automatically adds duplicate symbols (e.g., "Summer2025!!") to meet minimum length requirements
 
 ## 🚀 Quick Start
 
@@ -94,6 +95,9 @@ python password_generator.py "Denver" --words "company,brand,server" --output de
 # Corporate environment with 90-day password expiration
 python password_generator.py "Austin" --expiration 90 --min-length 8 --output corporate_passwords.txt
 
+# Generate passwords with minimum 12-character length (creates "Summer2025!!" style patterns)
+python password_generator.py "Seattle" --min-length 12 --count 50 --debug
+
 # Penetration testing with debug information
 python password_generator.py "Portland" --count 25 --debug --symbols 3
 
@@ -130,6 +134,14 @@ Passwords are ranked using a sophisticated scoring system based on:
 - **College Coverage**: FBS schools, regional universities, mascots
 - **Real-time Years**: Automatically uses current/previous years
 - **Expiration Awareness**: Filters months based on password age policies
+
+### Intelligent Length Padding
+When a minimum length is specified, the tool mimics real user behavior by automatically creating variants that meet length requirements:
+
+- **Duplicate Symbols**: "Summer2025!" becomes "Summer2025!!" for 12-char minimum
+- **Sequential Numbers**: "Finance2025!" becomes "Finance2025!123"
+- **Mixed Patterns**: "Company25!" becomes "Company25!@#"
+- **Smart Scoring**: Length-padded passwords receive priority bonuses based on real-world usage patterns
 
 ### Pattern Categories
 1. **Custom Words** (200+ points): Organization-specific terms

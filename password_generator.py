@@ -374,7 +374,7 @@ def leetspeak_level3(word: str) -> str:
     result = result.replace('ck', 'x').replace('ph', 'f')
     return result
 
-def generate_variations(base_words: List[str], symbols_count: int = 5, expiration_days: int = None) -> Set[str]:
+def generate_variations(base_words: List[str], symbols_count: int = 5, expiration_days: int = None, min_length: int = 0) -> Set[str]:
     """Generate password variations from base words using individual transformations only."""
     if not base_words:
         return set()
@@ -413,15 +413,141 @@ def generate_variations(base_words: List[str], symbols_count: int = 5, expiratio
             for suffix in ['', '123', '1', '01', '1234', '12345'] + current_years:
                 for symbol in active_symbols + ['']:
                     try:
-                        variations.add(form + suffix + symbol)
+                        base_password = form + suffix + symbol
+                        variations.add(base_password)
                         if suffix:  # Avoid empty middle parts
-                            variations.add(form + symbol + suffix)
+                            alt_password = form + symbol + suffix
+                            variations.add(alt_password)
                     except (TypeError, AttributeError):
                         continue
     
+    # Apply intelligent length padding if minimum length is specified
+    if min_length > 0:
+        variations = apply_length_padding(variations, min_length, active_symbols)
+    
     return variations
 
-def calculate_password_score(password: str, word_type: str, expiration_days: int = None) -> float:
+
+def apply_length_padding(passwords: Set[str], min_length: int, active_symbols: List[str]) -> Set[str]:
+    """Apply intelligent length padding to passwords that are close to minimum length."""
+    padded_passwords: Set[str] = set()
+    
+    for password in passwords:
+        padded_passwords.add(password)  # Always keep original
+        
+        current_length = len(password)
+        if current_length < min_length:
+            chars_needed = min_length - current_length
+            
+            # Only pad if we're reasonably close (within 4 characters)
+            if chars_needed <= 4:
+                padded_variants = generate_length_padding_variants(password, chars_needed, active_symbols)
+                padded_passwords.update(padded_variants)
+    
+    return padded_passwords
+
+
+def generate_length_padding_variants(password: str, chars_needed: int, active_symbols: List[str]) -> Set[str]:
+    """Generate realistic length padding variants based on real user behavior."""
+    variants: Set[str] = set()
+    
+    # Strategy 1: Duplicate last symbol (most common real behavior)
+    if password and password[-1] in active_symbols:
+        last_symbol = password[-1]
+        variants.add(password + last_symbol * chars_needed)
+    
+    # Strategy 2: Add most common symbols in order
+    for symbol in active_symbols[:3]:  # Use top 3 most common symbols
+        if chars_needed == 1:
+            variants.add(password + symbol)
+        elif chars_needed == 2:
+            variants.add(password + symbol * 2)
+            variants.add(password + symbol + '!')  # Mix with exclamation
+        elif chars_needed == 3:
+            variants.add(password + symbol * 3)
+            variants.add(password + symbol + '!!')
+            variants.add(password + '!' + symbol + '!')
+        elif chars_needed == 4:
+            variants.add(password + symbol * 4)
+            variants.add(password + symbol + '!!!')
+            variants.add(password + '!!' + symbol + '!')
+    
+    # Strategy 3: Sequential numbers (also common)
+    if chars_needed <= 3:
+        number_sequences = ['1', '12', '123', '1234']
+        if chars_needed <= len(number_sequences):
+            variants.add(password + number_sequences[chars_needed - 1])
+    
+    # Strategy 4: Mix of symbols and numbers
+    if chars_needed == 2:
+        variants.add(password + '1!')
+        variants.add(password + '!1')
+        variants.add(password + '!@')
+    elif chars_needed == 3:
+        variants.add(password + '12!')
+        variants.add(password + '1!!')
+        variants.add(password + '!@#')
+    elif chars_needed == 4:
+        variants.add(password + '123!')
+        variants.add(password + '1!!!')
+        variants.add(password + '!@#$')
+    
+    return variants
+
+
+def detect_length_padding_patterns(password: str, min_length: int) -> float:
+    """Detect and score common length-padding patterns that users employ."""
+    bonus = 0.0
+    length = len(password)
+    
+    if length < min_length:
+        return bonus
+    
+    # Check for duplicate symbols at the end (most common pattern)
+    if len(password) >= 2:
+        last_char = password[-1]
+        if last_char in '!@#$%^&*':
+            # Count consecutive duplicates at the end
+            consecutive_count = 0
+            for i in range(len(password) - 1, -1, -1):
+                if password[i] == last_char:
+                    consecutive_count += 1
+                else:
+                    break
+            
+            # If we have 2+ consecutive symbols that would make the password reach min_length
+            if consecutive_count >= 2:
+                estimated_base_length = length - (consecutive_count - 1)
+                if estimated_base_length < min_length <= length:
+                    bonus += 35.0  # High bonus for duplicate symbol padding (Summer2025!!)
+    
+    # Check for sequential number padding
+    if password.endswith('123') or password.endswith('1234'):
+        base_length = length - (4 if password.endswith('1234') else 3)
+        if base_length < min_length <= length:
+            bonus += 25.0  # Good bonus for number sequence padding
+    
+    # Check for mixed symbol/number padding patterns
+    common_padding_patterns = ['1!', '12!', '123!', '1!!', '1!!!', '!@', '!@#', '!@#$']
+    for pattern in common_padding_patterns:
+        if password.endswith(pattern):
+            base_length = length - len(pattern)
+            if base_length < min_length <= length:
+                bonus += 20.0  # Moderate bonus for mixed padding
+                break
+    
+    # Check for alternating symbol patterns
+    if length >= 4:
+        last_4 = password[-4:]
+        if last_4 in ['!@!@', '!#!#', '@!@!', '!@#!', '!2!2', '1!1!']:
+            base_length = length - 4
+            if base_length < min_length <= length:
+                bonus += 15.0  # Bonus for alternating patterns
+    
+    return bonus
+
+
+def calculate_password_score(password: str, word_type: str, expiration_days: int = None, min_length: int = 0) -> float:
     """Calculate likelihood score for a password based on real-world usage patterns."""
     score = 0.0
     
@@ -484,9 +610,27 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
         else:
             score += 5.0   # Mixed case patterns
     
-    # OPTIMAL LENGTH SCORING (corporate password policies)
+    # ENHANCED LENGTH SCORING with minimum length awareness
     length = len(password)
-    if 8 <= length <= 10:
+    
+    # Special bonuses for exactly meeting common minimum lengths
+    if min_length > 0 and length == min_length:
+        score += 30.0  # Big bonus for exactly meeting minimum length requirement
+    elif min_length > 0 and length == min_length + 1:
+        score += 20.0  # Good bonus for just exceeding minimum
+    elif min_length > 0 and length == min_length + 2:
+        score += 15.0  # Moderate bonus for slightly exceeding minimum
+    
+    # Enhanced length-padding detection and scoring
+    if min_length > 0 and length >= min_length:
+        # Check for common padding patterns that indicate length-driven behavior
+        padding_bonus = detect_length_padding_patterns(password, min_length)
+        score += padding_bonus
+    
+    # Original length scoring (enhanced for common corporate policies)
+    if length in [8, 10, 12, 14, 16]:  # Common minimum lengths
+        score += 20.0  # Bonus for exact common policy lengths
+    elif 8 <= length <= 10:
         score += 15.0  # Sweet spot for most corporate policies
     elif 11 <= length <= 12:
         score += 10.0  # Still good
@@ -582,16 +726,16 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
     
     return score
 
-def generate_scored_variations(base_words: List[str], word_type: str, symbols_count: int = 5, expiration_days: int = None) -> List[tuple]:
+def generate_scored_variations(base_words: List[str], word_type: str, symbols_count: int = 5, expiration_days: int = None, min_length: int = 0) -> List[tuple]:
     """Generate variations with scores for a word type."""
     if not base_words:
         return []
     
-    variations = generate_variations(base_words, symbols_count, expiration_days)
+    variations = generate_variations(base_words, symbols_count, expiration_days, min_length)
     scored_variations = []
     
     for password in variations:
-        score = calculate_password_score(password, word_type, expiration_days)
+        score = calculate_password_score(password, word_type, expiration_days, min_length)
         scored_variations.append((password, score, word_type))
     
     return scored_variations
@@ -662,42 +806,42 @@ def generate_passwords(city: str, custom_words: List[str] = None, min_length: in
     
     # Process each word type with appropriate scoring
     if COMMON_PASSWORDS:
-        scored_vars = generate_scored_variations(COMMON_PASSWORDS, 'common_passwords', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(COMMON_PASSWORDS, 'common_passwords', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if TECH_DEFAULTS:
-        scored_vars = generate_scored_variations(TECH_DEFAULTS, 'tech_defaults', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(TECH_DEFAULTS, 'tech_defaults', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if SEASONS:
-        scored_vars = generate_scored_variations(SEASONS, 'seasons', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(SEASONS, 'seasons', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if valid_months:
-        scored_vars = generate_scored_variations(valid_months, 'months', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(valid_months, 'months', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if KEYBOARD_WALKS:
-        scored_vars = generate_scored_variations(KEYBOARD_WALKS, 'keyboard_walks', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(KEYBOARD_WALKS, 'keyboard_walks', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if teams:
-        scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if mascots:
-        scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Process city variations
     city_words = [city_key, city_key.title(), city_key.upper()]
     if city_words:
-        scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Process custom words independently
     if custom_words:
-        scored_vars = generate_scored_variations(custom_words, 'custom', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(custom_words, 'custom', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Sort by score (highest first) and extract passwords
@@ -708,7 +852,7 @@ def generate_passwords(city: str, custom_words: List[str] = None, min_length: in
         print(f"Warning: No passwords generated for city '{city_validated}'.", file=sys.stderr)
         # Fallback to basic defaults
         fallback_words = COMMON_PASSWORDS + TECH_DEFAULTS
-        scored_vars = generate_scored_variations(fallback_words, 'common_passwords', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(fallback_words, 'common_passwords', symbols_count, expiration_days, min_length)
         scored_vars.sort(key=lambda x: x[1], reverse=True)
         all_passwords = [password for password, score, word_type in scored_vars]
     
@@ -742,42 +886,42 @@ def generate_passwords_with_scores(city: str, custom_words: List[str] = None, mi
     
     # Process each word type with appropriate scoring
     if COMMON_PASSWORDS:
-        scored_vars = generate_scored_variations(COMMON_PASSWORDS, 'common_passwords', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(COMMON_PASSWORDS, 'common_passwords', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if TECH_DEFAULTS:
-        scored_vars = generate_scored_variations(TECH_DEFAULTS, 'tech_defaults', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(TECH_DEFAULTS, 'tech_defaults', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if SEASONS:
-        scored_vars = generate_scored_variations(SEASONS, 'seasons', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(SEASONS, 'seasons', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if valid_months:
-        scored_vars = generate_scored_variations(valid_months, 'months', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(valid_months, 'months', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if KEYBOARD_WALKS:
-        scored_vars = generate_scored_variations(KEYBOARD_WALKS, 'keyboard_walks', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(KEYBOARD_WALKS, 'keyboard_walks', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if teams:
-        scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     if mascots:
-        scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Process city variations
     city_words = [city_key, city_key.title(), city_key.upper()]
     if city_words:
-        scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Process custom words independently
     if custom_words:
-        scored_vars = generate_scored_variations(custom_words, 'custom', symbols_count, expiration_days)
+        scored_vars = generate_scored_variations(custom_words, 'custom', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Sort by score (highest first)

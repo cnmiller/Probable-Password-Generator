@@ -5,6 +5,19 @@ All notable changes to the Password Generator project will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-01-16
+
+### Added
+- **Intelligent Length Padding**: When minimum length is specified, automatically generates realistic padding patterns (e.g., "Summer2025!!" for 12-char minimum)
+- **Advanced Padding Strategies**: Duplicate symbols, sequential numbers, and mixed symbol/number patterns based on real user behavior
+- **Enhanced Length Scoring**: Bonus points for passwords that exactly meet common minimum lengths (8, 10, 12, 14, 16)
+- **Padding Pattern Detection**: Smart scoring system recognizes and prioritizes length-driven password modifications
+
+### Enhanced
+- **Minimum Length Intelligence**: `--min-length` parameter now triggers intelligent padding instead of just filtering
+- **Real-world Accuracy**: Patterns based on penetration testing observations and user behavior studies
+- **Corporate Policy Awareness**: Better handling of length requirements common in enterprise environments
+
 ## [2.0.0] - 2025-01-16
 
 ### Added

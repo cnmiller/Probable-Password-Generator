@@ -5,6 +5,25 @@ All notable changes to the Password Generator project will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2025-01-16
+
+### Fixed
+- **Critical Prioritization Bug**: "Chase2025!!!" now correctly ranks higher than "Chase!2025@@"
+- **Seasonal Password Priority**: "Spring2025!!", "Summer2025!!" now appear right after custom words
+- **Compound Word Preservation**: "NewYork" case variation now properly generated alongside "Newyork"
+
+### Added
+- **Pattern Cleanliness Detection**: Identifies natural vs artificial password patterns
+- **Mixed Symbol Penalties**: Patterns like "!2025@@" heavily penalized (-40 to -50 points)
+- **Fine-grained Ending Scoring**: Consistent symbols rewarded ("!!!" > "!!" > "!")
+- **Symbol Placement Detection**: Penalizes unnatural symbol placement in middle of passwords
+
+### Enhanced
+- **Seasonal Scoring**: Clean seasonal patterns get near-custom-word priority (195 points)
+- **Pattern Recognition**: 228-point difference between clean and weird patterns
+- **Year Position Scoring**: Natural year placement at end gets bonuses
+- **Real-world Accuracy**: Based on actual penetration testing observations
+
 ## [2.2.0] - 2025-01-16
 
 ### Added

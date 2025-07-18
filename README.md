@@ -159,9 +159,11 @@ When a minimum length is specified, the tool mimics real user behavior by automa
 ### Advanced Prioritization
 The tool uses sophisticated scoring to prioritize passwords by real-world likelihood:
 
-- **Clean Patterns First**: "Chase2025!!" ranks higher than artificial patterns like "Chase$251!!!"
+- **Clean Patterns First**: "Chase2025!!!" ranks 228 points higher than "Chase!2025@@"
+- **Seasonal Priority**: "Spring2025!!", "Summer2025!!" appear right after custom words
 - **Compound Words**: "NewYork2025!" gets priority over "newyork2025!" for multi-word inputs
 - **Natural Behavior**: Patterns based on actual user behavior observed in penetration testing
+- **Symbol Consistency**: Rewards consistent symbols (!!!) over mixed patterns (!@#)
 - **Length Intelligence**: Passwords exactly meeting minimum lengths get priority bonuses
 
 ### Pattern Categories

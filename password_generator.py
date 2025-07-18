@@ -394,8 +394,8 @@ def generate_variations(base_words: List[str], symbols_count: int = 5, expiratio
         word_cap: str = word.capitalize()
         word_upper: str = word.upper()
         
-        # Basic variations
-        base_variations = [word_lower, word_cap, word_upper]
+        # Basic variations - also include the original word to preserve compound title case
+        base_variations = [word, word_lower, word_cap, word_upper]
         
         # Leetspeak variations
         leet1 = leetspeak_level1(word_lower)
@@ -500,28 +500,35 @@ def is_clean_natural_pattern(password: str) -> bool:
     # Get current years for pattern matching
     current_years = get_current_years()
     
-    # Common clean patterns users actually create:
-    # 1. Word + Year + Symbol(s): "Chase2025!", "Chase2025!!", "Chase2025!!!"
-    # 2. Word + Year: "Chase2025", "Chase25"
-    # 3. Word + Simple numbers + Symbol: "Chase123!", "Chase1!"
-    # 4. Word + Symbol: "Chase!", "Chase@"
+    # Pattern cleanliness is about symbol placement and consistency
+    # Clean: Word2025!!!, Word123!, Word!
+    # Not clean: Word!2025@@, Word#123$!, Word@!#
+    
+    # Check for mixed symbols in the middle (very unnatural)
+    # Patterns like "Chase!2025@@" should be penalized
+    for i in range(1, len(password) - 1):
+        if password[i] in '!@#$%^&*' and password[i-1].isalnum() and i < len(password) - 2 and password[i+1].isdigit():
+            # Symbol in the middle of word and numbers = not clean
+            return False
     
     # Check for clean year patterns
     for year in current_years:
         if year in password:
-            # Pattern: Word + Year + clean symbols
+            # Clean pattern: ends with year + consistent symbols
             if password.endswith(year + '!') or password.endswith(year + '!!') or password.endswith(year + '!!!'):
                 return True
             if password.endswith(year + '@') or password.endswith(year + '@@') or password.endswith(year + '@@@'):
                 return True
             if password.endswith(year + '#') or password.endswith(year + '##') or password.endswith(year + '###'):
                 return True
+            if password.endswith(year + '$') or password.endswith(year + '$$') or password.endswith(year + '$$$'):
+                return True
             # Just year at end
             if password.endswith(year):
                 return True
     
     # Check for simple number patterns
-    simple_endings = ['1', '12', '123', '1234', '01', '001']
+    simple_endings = ['1', '12', '123', '1234', '01', '001', '25', '24']
     for ending in simple_endings:
         if password.endswith(ending + '!') or password.endswith(ending + '!!') or password.endswith(ending + '!!!'):
             return True
@@ -530,12 +537,12 @@ def is_clean_natural_pattern(password: str) -> bool:
         if password.endswith(ending):
             return True
     
-    # Check for clean symbol patterns
-    if password.endswith('!') or password.endswith('!!') or password.endswith('!!!'):
+    # Check for clean symbol patterns at the end
+    if password.endswith('!') or password.endswith('!!') or password.endswith('!!!') or password.endswith('!!!!') or password.endswith('!!!!!'):
         return True
-    if password.endswith('@') or password.endswith('@@'):
+    if password.endswith('@') or password.endswith('@@') or password.endswith('@@@') or password.endswith('@@@@'):
         return True
-    if password.endswith('#') or password.endswith('##'):
+    if password.endswith('#') or password.endswith('##') or password.endswith('###'):
         return True
     
     # Check for no symbols/numbers (just the word)
@@ -543,6 +550,19 @@ def is_clean_natural_pattern(password: str) -> bool:
         return True
     
     return False
+
+
+def has_mixed_symbols(password: str) -> bool:
+    """Detect passwords with mixed/inconsistent symbol patterns."""
+    # Mixed patterns like "!2025@@" or "#2025!!" are unnatural
+    symbols_found = []
+    for char in password:
+        if char in '!@#$%^&*':
+            symbols_found.append(char)
+    
+    # If more than one type of symbol, it's mixed
+    unique_symbols = set(symbols_found)
+    return len(unique_symbols) > 1
 
 
 def detect_length_padding_patterns(password: str, min_length: int) -> float:
@@ -597,6 +617,36 @@ def detect_length_padding_patterns(password: str, min_length: int) -> float:
     return bonus
 
 
+def get_pattern_cleanliness_score(password: str) -> float:
+    """Additional fine-grained scoring for pattern cleanliness."""
+    score = 0.0
+    
+    # Consistent symbol repetition at the end is most natural
+    if password.endswith('!!!'):
+        score += 5.0
+    elif password.endswith('!!'):
+        score += 4.0
+    elif password.endswith('!'):
+        score += 3.0
+    
+    # Mixed symbols in weird places are unnatural
+    if re.search(r'[!@#$%^&*]\d+[!@#$%^&*]', password):
+        score -= 10.0  # Symbol-digit-symbol is weird
+    
+    # Clean year placement
+    current_years = get_current_years()
+    for year in current_years:
+        if year in password:
+            # Year at the end is natural
+            if password.endswith(year) or password.endswith(year + '!') or password.endswith(year + '!!') or password.endswith(year + '!!!'):
+                score += 3.0
+            # Year in the middle with symbols around it is unnatural
+            elif re.search(f'[!@#$%^&*]{year}[!@#$%^&*]', password):
+                score -= 5.0
+    
+    return score
+
+
 def calculate_password_score(password: str, word_type: str, expiration_days: int = None, min_length: int = 0) -> float:
     """Calculate likelihood score for a password based on real-world usage patterns."""
     score = 0.0
@@ -626,10 +676,9 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
     
     # CRITICAL FIX: Prioritize clean, natural patterns over padded variants
     is_clean_pattern = is_clean_natural_pattern(password)
-    if is_clean_pattern:
-        score += 100.0  # Major bonus for clean patterns like "Chase2025!!"
+    is_mixed_symbols = has_mixed_symbols(password)
     
-    # New priority weighting system with leetspeak-aware custom word scoring
+    # New priority weighting system
     if word_type == 'custom':
         # Check if this custom word has heavy leetspeak
         leet_char_count = sum(1 for char in password if char in '4310579@!$#()6^&*' and char in '4310579()')
@@ -639,10 +688,16 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
             score = 200.0  # Normal custom word priority
     elif word_type == 'common_passwords' and is_simple:
         score = 190.0  # Common passwords with no modifications
-    elif word_type == 'seasons' and has_year and not has_symbol:
-        score = 180.0  # Seasons + year
-    elif word_type == 'seasons' and has_year and has_symbol:
-        score = 170.0  # Seasons + year + symbol  
+    elif word_type == 'seasons':
+        # Seasonal passwords get very high priority with clean patterns
+        if has_year and is_clean_pattern and not is_mixed_symbols:
+            score = 195.0  # Almost as high as custom words!
+        elif has_year and has_symbol:
+            score = 170.0  # Seasons + year + symbol  
+        elif has_year and not has_symbol:
+            score = 180.0  # Seasons + year
+        else:
+            score = 150.0  # Basic seasons
     elif word_type == 'months' and has_year and not has_symbol:
         score = 160.0  # Months + year
     elif word_type == 'months' and has_year and has_symbol:
@@ -653,6 +708,14 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
         score = 130.0  # Mascots, etc
     else:
         score = 100.0  # Everything else (tech defaults, keyboard walks, etc)
+    
+    # Apply clean pattern bonus AFTER base scoring
+    if is_clean_pattern:
+        score += 50.0  # Significant bonus for clean patterns
+    
+    # Apply mixed symbol penalty
+    if is_mixed_symbols:
+        score -= 40.0  # Heavy penalty for mixed symbols like "!2025@@"
     
     # IMPROVED CASE PATTERN SCORING (major improvement)
     if len(password) > 0:
@@ -700,6 +763,11 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
     
     # SYMBOL FREQUENCY SCORING (based on real usage)
     if has_symbol:
+        # Check for unnatural symbol placement patterns
+        # Patterns like "Word!2025@@" should be heavily penalized
+        if re.search(r'[a-zA-Z]+[!@#$%^&*]+\d+[!@#$%^&*]+', password):
+            score -= 50.0  # Heavy penalty for symbol-number-symbol pattern
+        
         symbol_scores = {'!': 15.0, '@': 12.0, '#': 10.0, '$': 8.0, '%': 6.0, '^': 4.0, '&': 3.0, '*': 2.0}
         for symbol, symbol_score in symbol_scores.items():
             if symbol in password:
@@ -707,12 +775,25 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
                 break  # Only count the first (most common) symbol found
     
     # POSITION-BASED SCORING (endings are most common)
-    if password.endswith(('123', '1', '01', '!', '@')):
-        score += 18.0  # Very common endings
+    # Clean endings with year and repeated symbols get highest bonus
+    for year in current_years:
+        if password.endswith(year + '!!!'):
+            score += 30.0  # Triple exclamation with year - VERY common
+        elif password.endswith(year + '!!'):
+            score += 28.0  # Double exclamation with year - VERY common
+        elif password.endswith(year + '!'):
+            score += 25.0  # Single exclamation with year - common
+    
+    if password.endswith(('!!!', '!!!')):
+        score += 20.0  # Triple symbols are common for padding
+    elif password.endswith(('!!', '@@')):
+        score += 18.0  # Double symbols are very common
+    elif password.endswith(('123', '1', '01', '!', '@')):
+        score += 15.0  # Common single endings
     elif password.endswith(('1234', '12345', '#', '$')):
-        score += 12.0  # Common endings
+        score += 12.0  # Less common endings
     elif password.endswith(('%', '^', '&', '*')):
-        score += 8.0   # Less common endings
+        score += 8.0   # Rare endings
     
     # DYNAMIC YEAR PROXIMITY SCORING (current year gets highest score)
     if current_year_full in password:
@@ -780,6 +861,10 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
     if word_type == 'custom' and (has_year or password.endswith(('123', '1', '!'))):
         # Reduced bonus for custom words to prevent over-prioritization
         score += 8.0  # Reduced from 12.0
+    
+    # Apply fine-grained pattern cleanliness scoring
+    cleanliness_score = get_pattern_cleanliness_score(password)
+    score += cleanliness_score
     
     return score
 

@@ -5,6 +5,25 @@ All notable changes to the Password Generator project will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-01-16
+
+### Added
+- **Optional City Parameter**: City is now optional (`--city`) instead of required, allowing keywords-only generation
+- **Compound Word Intelligence**: Proper handling of multi-word inputs like "New York" → "NewYork", "newyork", "NewYork2025!"
+- **Advanced Prioritization**: Clean patterns like "Chase2025!!" now rank higher than artificial patterns like "Chase$251!!!"
+- **Compound Title Case Scoring**: "NewYork2025!" gets priority bonus over "newyork2025!" for compound words
+
+### Enhanced
+- **Prioritization Algorithm**: Complete overhaul based on real penetration testing observations
+- **Clean Pattern Detection**: Smart identification of natural user-created password patterns
+- **Realistic Padding**: Simplified padding strategies focusing on patterns users actually employ
+- **Command Line Interface**: More flexible usage with optional city parameter
+
+### Fixed
+- **Critical Scoring Bug**: Fixed backwards prioritization where artificial patterns ranked higher than natural ones
+- **Compound Word Generation**: Multi-word inputs now properly generate all case variations
+- **Length Padding**: Removed unrealistic padding patterns that don't reflect real user behavior
+
 ## [2.1.0] - 2025-01-16
 
 ### Added

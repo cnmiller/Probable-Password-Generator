@@ -448,51 +448,101 @@ def apply_length_padding(passwords: Set[str], min_length: int, active_symbols: L
 
 
 def generate_length_padding_variants(password: str, chars_needed: int, active_symbols: List[str]) -> Set[str]:
-    """Generate realistic length padding variants based on real user behavior."""
+    """Generate realistic length padding variants based on ACTUAL user behavior."""
     variants: Set[str] = set()
     
-    # Strategy 1: Duplicate last symbol (most common real behavior)
+    # CRITICAL FIX: Only generate the most realistic patterns
+    # Real users primarily just duplicate the last symbol
+    
+    # Strategy 1: Duplicate last symbol (90% of real behavior)
     if password and password[-1] in active_symbols:
         last_symbol = password[-1]
         variants.add(password + last_symbol * chars_needed)
     
-    # Strategy 2: Add most common symbols in order
-    for symbol in active_symbols[:3]:  # Use top 3 most common symbols
-        if chars_needed == 1:
-            variants.add(password + symbol)
-        elif chars_needed == 2:
-            variants.add(password + symbol * 2)
-            variants.add(password + symbol + '!')  # Mix with exclamation
-        elif chars_needed == 3:
-            variants.add(password + symbol * 3)
-            variants.add(password + symbol + '!!')
-            variants.add(password + '!' + symbol + '!')
-        elif chars_needed == 4:
-            variants.add(password + symbol * 4)
-            variants.add(password + symbol + '!!!')
-            variants.add(password + '!!' + symbol + '!')
-    
-    # Strategy 3: Sequential numbers (also common)
+    # Strategy 2: Add simple exclamation marks (very common)
     if chars_needed <= 3:
-        number_sequences = ['1', '12', '123', '1234']
-        if chars_needed <= len(number_sequences):
-            variants.add(password + number_sequences[chars_needed - 1])
+        variants.add(password + '!' * chars_needed)
     
-    # Strategy 4: Mix of symbols and numbers
-    if chars_needed == 2:
-        variants.add(password + '1!')
-        variants.add(password + '!1')
-        variants.add(password + '!@')
-    elif chars_needed == 3:
-        variants.add(password + '12!')
-        variants.add(password + '1!!')
-        variants.add(password + '!@#')
-    elif chars_needed == 4:
-        variants.add(password + '123!')
-        variants.add(password + '1!!!')
-        variants.add(password + '!@#$')
+    # Strategy 3: Very limited additional symbols (only for 1-2 characters)
+    if chars_needed == 1:
+        variants.add(password + '!')
+        variants.add(password + '@')
+    elif chars_needed == 2:
+        variants.add(password + '!!')
+        variants.add(password + '@@')
+    
+    # Don't generate the complex patterns that were causing bad prioritization
+    # Real users keep it simple!
     
     return variants
+
+
+def is_compound_title_case(password: str) -> bool:
+    """Detect compound title case patterns like 'NewYork2025!' or 'RedSox!'."""
+    if len(password) < 3:
+        return False
+    
+    # Look for patterns where multiple words are capitalized
+    # Example: NewYork, RedSox, SanFrancisco, etc.
+    
+    # Count internal capital letters (not at start)
+    internal_capitals = 0
+    for i in range(1, len(password)):
+        if password[i].isupper() and password[i-1].islower():
+            internal_capitals += 1
+    
+    # Must have at least one internal capital and start with uppercase
+    return password[0].isupper() and internal_capitals >= 1
+
+
+def is_clean_natural_pattern(password: str) -> bool:
+    """Identify clean, natural password patterns that users actually create."""
+    # Get current years for pattern matching
+    current_years = get_current_years()
+    
+    # Common clean patterns users actually create:
+    # 1. Word + Year + Symbol(s): "Chase2025!", "Chase2025!!", "Chase2025!!!"
+    # 2. Word + Year: "Chase2025", "Chase25"
+    # 3. Word + Simple numbers + Symbol: "Chase123!", "Chase1!"
+    # 4. Word + Symbol: "Chase!", "Chase@"
+    
+    # Check for clean year patterns
+    for year in current_years:
+        if year in password:
+            # Pattern: Word + Year + clean symbols
+            if password.endswith(year + '!') or password.endswith(year + '!!') or password.endswith(year + '!!!'):
+                return True
+            if password.endswith(year + '@') or password.endswith(year + '@@') or password.endswith(year + '@@@'):
+                return True
+            if password.endswith(year + '#') or password.endswith(year + '##') or password.endswith(year + '###'):
+                return True
+            # Just year at end
+            if password.endswith(year):
+                return True
+    
+    # Check for simple number patterns
+    simple_endings = ['1', '12', '123', '1234', '01', '001']
+    for ending in simple_endings:
+        if password.endswith(ending + '!') or password.endswith(ending + '!!') or password.endswith(ending + '!!!'):
+            return True
+        if password.endswith(ending + '@') or password.endswith(ending + '@@'):
+            return True
+        if password.endswith(ending):
+            return True
+    
+    # Check for clean symbol patterns
+    if password.endswith('!') or password.endswith('!!') or password.endswith('!!!'):
+        return True
+    if password.endswith('@') or password.endswith('@@'):
+        return True
+    if password.endswith('#') or password.endswith('##'):
+        return True
+    
+    # Check for no symbols/numbers (just the word)
+    if password.isalpha():
+        return True
+    
+    return False
 
 
 def detect_length_padding_patterns(password: str, min_length: int) -> float:
@@ -574,6 +624,11 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
         if word_type == 'months' and not contains_valid_month:
             score -= 50.0  # Heavy penalty for expired months
     
+    # CRITICAL FIX: Prioritize clean, natural patterns over padded variants
+    is_clean_pattern = is_clean_natural_pattern(password)
+    if is_clean_pattern:
+        score += 100.0  # Major bonus for clean patterns like "Chase2025!!"
+    
     # New priority weighting system with leetspeak-aware custom word scoring
     if word_type == 'custom':
         # Check if this custom word has heavy leetspeak
@@ -603,6 +658,8 @@ def calculate_password_score(password: str, word_type: str, expiration_days: int
     if len(password) > 0:
         if password[0].isupper() and len(password) > 1 and password[1:].islower():
             score += 25.0  # Title case (Cowboys2025) - MOST COMMON
+        elif is_compound_title_case(password):
+            score += 30.0  # Compound title case (NewYork2025) - VERY COMMON for compound words
         elif password.islower():
             score += 15.0  # All lowercase - moderately common
         elif password.isupper():
@@ -790,17 +847,32 @@ def filter_by_length(passwords: List[str], min_length: int) -> List[str]:
         return passwords
     return [pwd for pwd in passwords if len(pwd) >= min_length]
 
-def generate_passwords(city: str, custom_words: List[str] = None, min_length: int = 0, symbols_count: int = 5, expiration_days: int = None) -> List[str]:
+def create_compound_word_variations(text: str) -> List[str]:
+    """Create proper compound word variations like 'New York' -> 'NewYork', 'newyork'."""
+    variations = []
+    
+    # Original text variations
+    variations.extend([text.lower(), text.title(), text.upper()])
+    
+    # Compound word variations (remove spaces and capitalize appropriately)
+    if ' ' in text:
+        # "New York" -> "NewYork" (title case compound)
+        title_compound = ''.join(word.capitalize() for word in text.split())
+        variations.append(title_compound)
+        
+        # "new york" -> "newyork" (lowercase compound)  
+        lower_compound = ''.join(word.lower() for word in text.split())
+        variations.append(lower_compound)
+        
+        # "NEW YORK" -> "NEWYORK" (uppercase compound)
+        upper_compound = ''.join(word.upper() for word in text.split())
+        variations.append(upper_compound)
+    
+    return list(set(variations))  # Remove duplicates
+
+
+def generate_passwords(city: str = None, custom_words: List[str] = None, min_length: int = 0, symbols_count: int = 5, expiration_days: int = None) -> List[str]:
     """Generate password candidates based on city, custom words, and length requirements."""
-    city_validated = validate_city_input(city)
-    city_key = city_validated.lower()
-    
-    teams: List[str] = PRO_TEAMS.get(city_key, [])
-    mascots: List[str] = FBS_MASCOTS.get(city_key, [])
-    
-    # Get dynamic months based on expiration policy
-    valid_months = get_valid_months(expiration_days)
-    
     # Process each word list independently with scoring
     all_scored_variations: List[tuple] = []
     
@@ -817,6 +889,8 @@ def generate_passwords(city: str, custom_words: List[str] = None, min_length: in
         scored_vars = generate_scored_variations(SEASONS, 'seasons', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
+    # Get dynamic months based on expiration policy
+    valid_months = get_valid_months(expiration_days)
     if valid_months:
         scored_vars = generate_scored_variations(valid_months, 'months', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
@@ -825,23 +899,36 @@ def generate_passwords(city: str, custom_words: List[str] = None, min_length: in
         scored_vars = generate_scored_variations(KEYBOARD_WALKS, 'keyboard_walks', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
-    if teams:
-        scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days, min_length)
-        all_scored_variations.extend(scored_vars)
-    
-    if mascots:
-        scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days, min_length)
-        all_scored_variations.extend(scored_vars)
-    
-    # Process city variations
-    city_words = [city_key, city_key.title(), city_key.upper()]
-    if city_words:
-        scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days, min_length)
-        all_scored_variations.extend(scored_vars)
+    # Process city-based words if city is provided
+    if city:
+        city_validated = validate_city_input(city)
+        city_key = city_validated.lower()
+        
+        teams: List[str] = PRO_TEAMS.get(city_key, [])
+        mascots: List[str] = FBS_MASCOTS.get(city_key, [])
+        
+        if teams:
+            scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days, min_length)
+            all_scored_variations.extend(scored_vars)
+        
+        if mascots:
+            scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days, min_length)
+            all_scored_variations.extend(scored_vars)
+        
+        # Process city variations with proper compound word handling
+        city_words = create_compound_word_variations(city_validated)
+        if city_words:
+            scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days, min_length)
+            all_scored_variations.extend(scored_vars)
     
     # Process custom words independently
     if custom_words:
-        scored_vars = generate_scored_variations(custom_words, 'custom', symbols_count, expiration_days, min_length)
+        # Apply compound word variations to custom words too
+        expanded_custom_words = []
+        for word in custom_words:
+            expanded_custom_words.extend(create_compound_word_variations(word))
+        
+        scored_vars = generate_scored_variations(expanded_custom_words, 'custom', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Sort by score (highest first) and extract passwords
@@ -849,7 +936,7 @@ def generate_passwords(city: str, custom_words: List[str] = None, min_length: in
     all_passwords = [password for password, score, word_type in all_scored_variations]
     
     if not all_passwords:
-        print(f"Warning: No passwords generated for city '{city_validated}'.", file=sys.stderr)
+        print("Warning: No passwords generated. Using fallback defaults.", file=sys.stderr)
         # Fallback to basic defaults
         fallback_words = COMMON_PASSWORDS + TECH_DEFAULTS
         scored_vars = generate_scored_variations(fallback_words, 'common_passwords', symbols_count, expiration_days, min_length)
@@ -870,17 +957,8 @@ def generate_passwords(city: str, custom_words: List[str] = None, min_length: in
         print(f"Error processing password results: {e}", file=sys.stderr)
         sys.exit(1)
 
-def generate_passwords_with_scores(city: str, custom_words: List[str] = None, min_length: int = 0, symbols_count: int = 5, expiration_days: int = None) -> List[tuple]:
+def generate_passwords_with_scores(city: str = None, custom_words: List[str] = None, min_length: int = 0, symbols_count: int = 5, expiration_days: int = None) -> List[tuple]:
     """Generate password candidates with scores for debugging."""
-    city_validated = validate_city_input(city)
-    city_key = city_validated.lower()
-    
-    teams: List[str] = PRO_TEAMS.get(city_key, [])
-    mascots: List[str] = FBS_MASCOTS.get(city_key, [])
-    
-    # Get dynamic months based on expiration policy  
-    valid_months = get_valid_months(expiration_days)
-    
     # Process each word list independently with scoring
     all_scored_variations: List[tuple] = []
     
@@ -897,6 +975,8 @@ def generate_passwords_with_scores(city: str, custom_words: List[str] = None, mi
         scored_vars = generate_scored_variations(SEASONS, 'seasons', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
+    # Get dynamic months based on expiration policy  
+    valid_months = get_valid_months(expiration_days)
     if valid_months:
         scored_vars = generate_scored_variations(valid_months, 'months', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
@@ -905,23 +985,36 @@ def generate_passwords_with_scores(city: str, custom_words: List[str] = None, mi
         scored_vars = generate_scored_variations(KEYBOARD_WALKS, 'keyboard_walks', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
-    if teams:
-        scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days, min_length)
-        all_scored_variations.extend(scored_vars)
-    
-    if mascots:
-        scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days, min_length)
-        all_scored_variations.extend(scored_vars)
-    
-    # Process city variations
-    city_words = [city_key, city_key.title(), city_key.upper()]
-    if city_words:
-        scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days, min_length)
-        all_scored_variations.extend(scored_vars)
+    # Process city-based words if city is provided
+    if city:
+        city_validated = validate_city_input(city)
+        city_key = city_validated.lower()
+        
+        teams: List[str] = PRO_TEAMS.get(city_key, [])
+        mascots: List[str] = FBS_MASCOTS.get(city_key, [])
+        
+        if teams:
+            scored_vars = generate_scored_variations(teams, 'teams', symbols_count, expiration_days, min_length)
+            all_scored_variations.extend(scored_vars)
+        
+        if mascots:
+            scored_vars = generate_scored_variations(mascots, 'mascots', symbols_count, expiration_days, min_length)
+            all_scored_variations.extend(scored_vars)
+        
+        # Process city variations with proper compound word handling
+        city_words = create_compound_word_variations(city_validated)
+        if city_words:
+            scored_vars = generate_scored_variations(city_words, 'city', symbols_count, expiration_days, min_length)
+            all_scored_variations.extend(scored_vars)
     
     # Process custom words independently
     if custom_words:
-        scored_vars = generate_scored_variations(custom_words, 'custom', symbols_count, expiration_days, min_length)
+        # Apply compound word variations to custom words too
+        expanded_custom_words = []
+        for word in custom_words:
+            expanded_custom_words.extend(create_compound_word_variations(word))
+        
+        scored_vars = generate_scored_variations(expanded_custom_words, 'custom', symbols_count, expiration_days, min_length)
         all_scored_variations.extend(scored_vars)
     
     # Sort by score (highest first)
@@ -949,16 +1042,18 @@ def main() -> None:
     """Main function to handle command line arguments and generate passwords."""
     try:
         parser = argparse.ArgumentParser(
-            description="Generate password candidates based on city and common patterns.",
+            description="Generate password candidates based on keywords, city, and common patterns.",
             epilog="Examples:\n"
-                   "  python password_generator.py 'New York' --count 50\n"
-                   "  python password_generator.py 'Dallas' --words 'company,brand,server' --min-length 8\n"
-                   "  python password_generator.py 'Boston' --words /path/to/wordlist.txt --output passwords.txt\n"
-                   "  python password_generator.py 'Seattle' --expiration 60 --symbols 3 --output seattle_passwords.txt\n"
-                   "  python password_generator.py 'Miami' --expiration 90 --words 'finance,corp' --debug",
+                   "  python password_generator.py --words 'chase,finance' --min-length 12 --count 50\n"
+                   "  python password_generator.py --city 'New York' --count 50\n"
+                   "  python password_generator.py --city 'Dallas' --words 'company,brand,server' --min-length 8\n"
+                   "  python password_generator.py --words /path/to/wordlist.txt --output passwords.txt\n"
+                   "  python password_generator.py --city 'Seattle' --expiration 60 --symbols 3 --output seattle_passwords.txt\n"
+                   "  python password_generator.py --words 'finance,corp' --expiration 90 --debug",
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
-        parser.add_argument("city", help="City name (e.g., 'New York', 'Dallas', 'Pittsburgh')")
+        parser.add_argument("--city", type=str, 
+                          help="City name for geographic passwords (e.g., 'New York', 'Dallas', 'Pittsburgh')")
         parser.add_argument("--count", type=int, 
                           help="Number of passwords to show (default: all combinations, max: 100,000)")
         parser.add_argument("--output", type=str, 
@@ -975,6 +1070,12 @@ def main() -> None:
                           help="Show password scores for debugging (default: false)")
         
         args = parser.parse_args()
+        
+        # Validate that at least one source is provided
+        if not args.city and not args.words:
+            print("Error: Either --city or --words must be provided.", file=sys.stderr)
+            print("Use --help for usage examples.", file=sys.stderr)
+            sys.exit(1)
         
         # Validate count if provided
         generate_all = args.count is None

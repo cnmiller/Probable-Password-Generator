@@ -27,14 +27,17 @@ A sophisticated, likelihood-aware password generator designed for penetration te
 ## 🚀 Quick Start
 
 ```bash
+# Generate passwords from keywords only
+python password_generator.py --words "chase,finance" --min-length 12 --count 50
+
 # Generate all combinations for a city
-python password_generator.py "New York"
+python password_generator.py --city "New York"
 
 # Generate top 100 passwords and save to file
-python password_generator.py "Seattle" --count 100 --output seattle_passwords.txt
+python password_generator.py --city "Seattle" --count 100 --output seattle_passwords.txt
 
 # Include custom words with expiration policy
-python password_generator.py "Dallas" --words "company,finance,server" --expiration 60
+python password_generator.py --city "Dallas" --words "company,finance,server" --expiration 60
 ```
 
 ## 📋 Installation
@@ -54,14 +57,14 @@ chmod +x password_generator.py
 
 ### Basic Syntax
 ```bash
-python password_generator.py <city> [options]
+python password_generator.py [options]
 ```
 
 ### Command Line Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `city` | Target city name (required) | - |
+| `--city` | Target city name (optional) | None |
 | `--count` | Number of passwords to generate | All combinations |
 | `--output` | Output file path | stdout |
 | `--words` | Custom words (comma-separated or file path) | None |
@@ -70,39 +73,50 @@ python password_generator.py <city> [options]
 | `--expiration` | Password expiration in days | None |
 | `--debug` | Show password scores and types | False |
 
+**Note**: Either `--city` or `--words` must be provided.
+
 ### Usage Examples
 
 #### Basic Generation
 ```bash
 # Generate all combinations for Boston
-python password_generator.py "Boston"
+python password_generator.py --city "Boston"
 
 # Generate top 50 passwords for Chicago
-python password_generator.py "Chicago" --count 50
+python password_generator.py --city "Chicago" --count 50
+
+# Generate from keywords only
+python password_generator.py --words "chase,finance,company" --count 50
 ```
 
 #### File Output
 ```bash
 # Save all combinations to file
-python password_generator.py "Miami" --output miami_passwords.txt
+python password_generator.py --city "Miami" --output miami_passwords.txt
 
 # Generate with custom words and save
-python password_generator.py "Denver" --words "company,brand,server" --output denver_custom.txt
+python password_generator.py --city "Denver" --words "company,brand,server" --output denver_custom.txt
+
+# Keywords only with file output
+python password_generator.py --words "admin,server,database" --output custom_passwords.txt
 ```
 
 #### Advanced Options
 ```bash
 # Corporate environment with 90-day password expiration
-python password_generator.py "Austin" --expiration 90 --min-length 8 --output corporate_passwords.txt
+python password_generator.py --city "Austin" --expiration 90 --min-length 8 --output corporate_passwords.txt
 
 # Generate passwords with minimum 12-character length (creates "Summer2025!!" style patterns)
-python password_generator.py "Seattle" --min-length 12 --count 50 --debug
+python password_generator.py --city "Seattle" --min-length 12 --count 50 --debug
+
+# Keywords-only with minimum length and debug information
+python password_generator.py --words "chase,finance" --min-length 12 --count 25 --debug
 
 # Penetration testing with debug information
-python password_generator.py "Portland" --count 25 --debug --symbols 3
+python password_generator.py --city "Portland" --count 25 --debug --symbols 3
 
 # Custom wordlist from file
-python password_generator.py "Phoenix" --words /path/to/wordlist.txt --output phoenix_passwords.txt
+python password_generator.py --city "Phoenix" --words /path/to/wordlist.txt --output phoenix_passwords.txt
 ```
 
 #### Custom Word Files
@@ -139,9 +153,16 @@ Passwords are ranked using a sophisticated scoring system based on:
 When a minimum length is specified, the tool mimics real user behavior by automatically creating variants that meet length requirements:
 
 - **Duplicate Symbols**: "Summer2025!" becomes "Summer2025!!" for 12-char minimum
-- **Sequential Numbers**: "Finance2025!" becomes "Finance2025!123"
-- **Mixed Patterns**: "Company25!" becomes "Company25!@#"
+- **Realistic Patterns**: Focuses on simple, natural padding that users actually employ
 - **Smart Scoring**: Length-padded passwords receive priority bonuses based on real-world usage patterns
+
+### Advanced Prioritization
+The tool uses sophisticated scoring to prioritize passwords by real-world likelihood:
+
+- **Clean Patterns First**: "Chase2025!!" ranks higher than artificial patterns like "Chase$251!!!"
+- **Compound Words**: "NewYork2025!" gets priority over "newyork2025!" for multi-word inputs
+- **Natural Behavior**: Patterns based on actual user behavior observed in penetration testing
+- **Length Intelligence**: Passwords exactly meeting minimum lengths get priority bonuses
 
 ### Pattern Categories
 1. **Custom Words** (200+ points): Organization-specific terms

@@ -1,4 +1,4 @@
-# Password Generator for Penetration Testing
+# Probable Password Generator
 
 A sophisticated, likelihood-aware password generator designed for penetration testing and security assessments. This tool generates password candidates based on geographic locations, sports teams, college mascots, and common password patterns, ranked by real-world usage probability.
 
@@ -48,8 +48,8 @@ python password_generator.py --city "Dallas" --words "company,finance,server" --
 
 ### Setup
 ```bash
-git clone https://github.com/your-username/password-generator.git
-cd password-generator
+git clone https://github.com/cnmiller/Probable-Password-Generator.git
+cd Probable-Password-Generator
 chmod +x password_generator.py
 ```
 
@@ -179,7 +179,7 @@ The tool uses sophisticated scoring to prioritize passwords by real-world likeli
 
 ### Standard Mode
 ```bash
-$ python password_generator.py "Seattle" --count 10
+$ python password_generator.py --city "Seattle" --count 10
 Generating top 10 passwords
 Spring2025!
 Summer2025!
@@ -195,7 +195,7 @@ Winter2025@
 
 ### Debug Mode
 ```bash
-$ python password_generator.py "Seattle" --count 5 --debug
+$ python password_generator.py --city "Seattle" --count 5 --debug
 Generating top 5 passwords
 Spring2025! (Score: 276.0, Type: seasons)
 Summer2025! (Score: 275.0, Type: seasons)
@@ -250,7 +250,7 @@ The likelihood scoring system considers:
 ## 📁 Project Structure
 
 ```
-password-generator/
+Probable-Password-Generator/
 ├── password_generator.py    # Main application
 ├── README.md               # This file
 ├── LICENSE                 # MIT License
@@ -281,9 +281,8 @@ This tool is intended for authorized security testing only. Users are responsibl
 
 ## 📞 Support
 
-- Report bugs: [GitHub Issues](https://github.com/your-username/password-generator/issues)
-- Feature requests: [GitHub Discussions](https://github.com/your-username/password-generator/discussions)
-- Security concerns: Email security@yourproject.com
+- Report bugs: [GitHub Issues](https://github.com/cnmiller/Probable-Password-Generator/issues)
+- Feature requests: [GitHub Discussions](https://github.com/cnmiller/Probable-Password-Generator/discussions)
 
 ---
 
